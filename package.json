@@ -1,0 +1,26 @@
+{
+  "name": "chat-server",
+  "version": "1.0.0",
+  "description": "websocket server for niezalezny-chat",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gjarzabek/chat-server.git"
+  },
+  "keywords": [],
+  "author": "Grzegorz Jarząbek",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Gjarzabek/chat-server/issues"
+  },
+  "homepage": "https://github.com/Gjarzabek/chat-server#readme",
+  "dependencies": {
+    "@types/ws": "^7.4.0",
+    "http": "0.0.1-security",
+    "typescript": "^4.2.3",
+    "ws": "^7.4.4"
+  }
+}
