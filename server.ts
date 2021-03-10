@@ -1,8 +1,8 @@
 import * as http from 'http';
 import * as WebSocket from 'ws';
-import {msgType, ConnectedUser} from './interfaces';
-import {UserMap} from './dataStructures';
-import {initialUriParse} from './baselib';
+import {msgType, ConnectedUser} from './Interfaces/interfaces';
+import UserMap from './DataStructures/UserMap';
+import {initialUriParse} from './baseLib/baselib';
 
 const PORT: number = 8999;
 var UsersOnline: UserMap = new UserMap();
@@ -160,7 +160,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             UsersOnline.addUser(userInfo, req.socket);
         }
     }
-    
+
     firstConnect();
     //send immediatly a feedback to the incoming connection
 });

@@ -1,6 +1,6 @@
-import {ConnectedUser} from './interfaces'
+import {ConnectedUser} from '../Interfaces/interfaces'
 
-export class UserMap {
+export default class UserMap {
 
     private onlineUsers: Map<string, ConnectedUser>;
 
