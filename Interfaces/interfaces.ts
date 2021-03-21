@@ -11,6 +11,6 @@ export interface msgType {
 export interface ConnectedUser {
     id: string,
     connection: any
-    nick: string,
+    name: string,
     lastPing?: number,
 }

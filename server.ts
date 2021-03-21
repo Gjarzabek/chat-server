@@ -1,10 +1,13 @@
 import * as http from 'http';
 import * as WebSocket from 'ws';
+import 'dotenv/config';
 import {msgType, ConnectedUser} from './Interfaces/interfaces';
 import UserMap from './DataStructures/UserMap';
-import {initialUriParse} from './baseLib/baselib';
-
+import {initialUriVerify} from './baseLib/baselib';
+import mongoose from 'mongoose';
+import UserModel from './userModel';
 const PORT: number = 8999;
+
 var UsersOnline: UserMap = new UserMap();
 
 const server = http.createServer((reg, res) => console.log("reveived a message"));
@@ -12,6 +15,20 @@ const server = http.createServer((reg, res) => console.log("reveived a message")
 const WsServer = new WebSocket.Server({
     server
 });
+
+//@ts-ignore
+const URI: string = process.env.DB_URI;
+mongoose.connect(URI,
+    {useNewUrlParser: true, useUnifiedTopology: true},
+    (err) => {
+        if (err) {
+            console.log("Error:", err);
+        }
+        else {
+            console.log("Connected to DB:", URI);
+        }
+    }
+)
 
 WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
@@ -150,12 +167,20 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     });
 
     const firstConnect = async () => {
-        const userInfo = initialUriParse(req.url);
+        const userInfo = initialUriVerify(req.url);
         if (userInfo === undefined) {
             const errMsg: msgType = {method: "ERROR", info:"Brak dostępu - nie rozpoznano użytkownika"}; 
             ws.close(1000, JSON.stringify(errMsg));
         }
         else {
+            let userDbInfo = await UserModel.findOne(
+                {_id: userInfo},
+                '-_id name status email friends chats notifications desc icon joinTime groups'
+                );
+            ws.send(JSON.stringify({
+                method: 'loginPayload',
+                payload: userDbInfo
+            }));
             console.log("new user connected:", userInfo);
             UsersOnline.addUser(userInfo, req.socket);
         }

@@ -1,16 +1,25 @@
-export const initialUriParse = function(uri: string): any {
-    if (uri.substr(0, 1) === "/") {
-        const p = uri.lastIndexOf(":");
-        if (p === -1)
-            return undefined;
-        
-        const strNick = uri.slice(p+1);
-        const strId: string = uri.slice(1, p);
+import 'dotenv/config';
+import {verify} from 'jsonwebtoken';
 
-        if (strId.length === 6 && strNick !== undefined) {
-            return {id: strId, nick: strNick};
+export const initialUriVerify = function(uri: string): any {
+    if (uri.substr(0, 1) === "/") {
+        const strToken = uri.slice(1);
+
+        let userCredits;
+        try {
+            userCredits = verify(strToken, process.env.ACCESS_SECRET_TOKEN);
         }
-        else return undefined;
+        catch (error) {
+            console.log("jwtError:", error);
+            return undefined;
+        }
+        if (!userCredits) {
+            return undefined;
+        }
+
+        console.log("userCredits", userCredits);
+        //@ts-ignore
+        return userCredits.id;
     }
     else return undefined;
 }

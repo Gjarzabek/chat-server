@@ -1,4 +1,4 @@
-import {ConnectedUser} from '../Interfaces/interfaces'
+import {ConnectedUser} from '../Interfaces/interfaces';
 
 export default class UserMap {
 
@@ -8,12 +8,8 @@ export default class UserMap {
         this.onlineUsers = new Map<string, ConnectedUser>();
     }
 
-    public addUser(userInfo: any, userSocket: any) : void {
-        this.onlineUsers.set(userInfo.id, {
-            id: userInfo.id,
-            nick: userInfo.nick,
-            connection: userSocket
-        });
+    public addUser(userId: any, userSocket: any) : void {
+        this.onlineUsers.set(userId, userSocket);
     }
 
 }
