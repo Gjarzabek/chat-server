@@ -1,7 +1,7 @@
 import * as http from 'http';
 import * as WebSocket from 'ws';
 import 'dotenv/config';
-import {msgType, ConnectedUser} from './Interfaces/interfaces';
+import {msgType, Alert} from './Interfaces/interfaces';
 import UserMap from './DataStructures/UserMap';
 import {initialUriVerify} from './baseLib/baselib';
 import mongoose from 'mongoose';
@@ -39,9 +39,13 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     //connection is up, let's add a simple simple event
     ws.on('message', (message: string) => {
 
-        const msg: msgType = JSON.parse(message);
+        const msg: any = JSON.parse(message);
         
         switch(msg.method) {
+            case 'close':
+                UsersOnline.removeUser(msg.id);
+                console.log("close connection, user id:", msg.id);
+                break;
             case 'isAlivePing':
                 /*
                 payload: {
@@ -67,14 +71,43 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 // and ppl that are in group with him
                 break;
             case 'friendInvite':
-                // send friend invite to a user of and ID
-                /*
-                    payload: {
-                        fromId: number,
-                        toId: number,
-                        timestamp: number
+                const fun = async () => {
+
+                    let user: any = await UserModel.findById(msg.toId);
+                    if (!user)  return;
+                    
+                    const invitePayload: Alert = {
+                        topic: "Zaprosznie do znajomych",
+                        info: `${msg.fromName} wysyła ci zaproszenie do grona znajomych`,
+                        fromId: msg.fromId,
+                        toId: msg.toId
                     }
-                */
+
+                    UserModel.updateOne(
+                        { _id: msg.toId }, 
+                        { $push: { notifications: invitePayload } },
+                        {new: true},
+                        async (err: any, user: any) => {
+                            if (err) {
+                                console.warn("DB ERROR", err)
+                            } else {
+                                if (user) {
+                                    console.log("succes alert Add", user);
+                                }
+                                else {
+                                    console.warn("DB ERROR", user);
+                                }
+                            }
+                        }
+                    );
+
+                    if (user.status != 'niedostępny') {
+                        UsersOnline.sendToUser(msg.toId, "Alert", invitePayload);
+                        console.log("sending Alert:", invitePayload);
+                    }
+                };
+
+                fun();
                 break;
             case 'friendAccept':
                 /*
@@ -167,6 +200,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     });
 
     const firstConnect = async () => {
+        //@ts-ignore
         const userInfo = initialUriVerify(req.url);
         if (userInfo === undefined) {
             const errMsg: msgType = {method: "ERROR", info:"Brak dostępu - nie rozpoznano użytkownika"}; 
@@ -182,7 +216,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 payload: userDbInfo
             }));
             console.log("new user connected:", userInfo);
-            UsersOnline.addUser(userInfo, req.socket);
+            UsersOnline.addUser(userInfo, ws);
         }
     }
 

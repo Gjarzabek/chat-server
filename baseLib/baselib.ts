@@ -7,6 +7,7 @@ export const initialUriVerify = function(uri: string): any {
 
         let userCredits;
         try {
+            //@ts-ignore
             userCredits = verify(strToken, process.env.ACCESS_SECRET_TOKEN);
         }
         catch (error) {

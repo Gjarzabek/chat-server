@@ -8,9 +8,9 @@ export interface msgType {
     info?: string
 }
 
-export interface ConnectedUser {
-    id: string,
-    connection: any
-    name: string,
-    lastPing?: number,
+export interface Alert {
+    topic: string,
+    info: string,
+    fromId: string,
+    toId: string
 }
