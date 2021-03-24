@@ -1,4 +1,4 @@
-import {Alert} from '../Interfaces/interfaces';
+import {Alert, FriendInfo} from '../Interfaces/interfaces';
 
 export default class UserMap {
 
@@ -16,7 +16,7 @@ export default class UserMap {
         this.onlineUsers.delete(userId);
     }
 
-    public sendToUser(userId: string, method: string, data: Alert | undefined) {
+    public sendToUser(userId: string, method: string, data: Alert | FriendInfo) {
         if (this.onlineUsers.has(userId) && data != undefined) {
             this.onlineUsers.get(userId)!.send(JSON.stringify(
                 {

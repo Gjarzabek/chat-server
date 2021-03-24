@@ -13,4 +13,14 @@ export interface Alert {
     info: string,
     fromId: string,
     toId: string
+    id: string
+    new: boolean
+}
+
+export interface FriendInfo {
+    name: string,
+    status: string,
+    desc: string,
+    icon: string,
+    joinTime: string
 }

@@ -3,11 +3,17 @@ import mongoose from 'mongoose';
 const UserSchema = new mongoose.Schema({
     _id: String, 
     name: String,
-    password: String,
     status: {
         type: String,
         default: "niedostępny"
     },
+    desc: String,
+    icon: {
+        type: String,
+        default: "bird"
+    },
+    joinTime: String,
+    password: String,
     email: {
         type: String,
         unique: true
@@ -19,13 +25,7 @@ const UserSchema = new mongoose.Schema({
         {id: String}
     ],
     groups: [],
-    notifications: [],
-    desc: String,
-    icon: {
-        type: String,
-        default: "bird"
-    },
-    joinTime: String
+    notifications: []
 }, { _id: false });
 
 export default mongoose.model('User', UserSchema, 'users');

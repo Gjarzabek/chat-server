@@ -1,11 +1,12 @@
 import * as http from 'http';
 import * as WebSocket from 'ws';
 import 'dotenv/config';
-import {msgType, Alert} from './Interfaces/interfaces';
+import {msgType, Alert, FriendInfo} from './Interfaces/interfaces';
 import UserMap from './DataStructures/UserMap';
 import {initialUriVerify} from './baseLib/baselib';
 import mongoose from 'mongoose';
 import UserModel from './userModel';
+import { isRegularExpressionLiteral } from 'typescript';
 const PORT: number = 8999;
 
 var UsersOnline: UserMap = new UserMap();
@@ -70,17 +71,88 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 */
                 // and ppl that are in group with him
                 break;
+            case 'markAlertsOld':
+                const f = async () => {
+                    const user = await UserModel.findById(msg.who);
+                    //@ts-ignore
+                    let oldAlerts = user.notifications;
+                    for (const old of oldAlerts) {
+                        for (const id of msg.alerts) {
+                            if (id === old.id) {
+                                old.new = false;
+                            }
+                        }
+                    }
+
+                    UserModel.updateOne(
+                        { _id: msg.who }, 
+                        { notifications: oldAlerts },
+                        {new: true},
+                        async (err: any, user: any) => {
+                            if (err) {
+                                console.warn("DB ERROR", err)
+                            } else {
+                                if (user) {
+                                    console.log("succes alerts replace", user);
+                                }
+                                else {
+                                    console.warn("DB ERROR", user);
+                                }
+                            }
+                        }
+                    );
+                }
+
+                f();
+                break;
+            case 'deleteAlert':
+                // userId, alertId
+                const action = async () => {
+                    const user = await UserModel.findById(msg.userId);
+                    //@ts-ignore
+                    let oldAlerts = user.notifications;
+                    oldAlerts = oldAlerts.filter((alert:any) => {return alert.id != msg.alertId});
+
+                    UserModel.updateOne(
+                        { _id: msg.userId }, 
+                        { notifications: oldAlerts },
+                        {new: true},
+                        async (err: any, user: any) => {
+                            if (err) {
+                                console.warn("DB ERROR", err)
+                            } else {
+                                if (user) {
+                                    console.log("succes alerts remove", user);
+                                }
+                                else {
+                                    console.warn("DB ERROR", user);
+                                }
+                            }
+                        }
+                    );
+                }
+
+                action();
+                break;
             case 'friendInvite':
-                const fun = async () => {
+                const inviteFriendFun = async () => {
 
                     let user: any = await UserModel.findById(msg.toId);
-                    if (!user)  return;
                     
+                    if (!user || user.friends.includes(msg.toId))  return;
+                    
+                    // check if friend request was allready sent
+                    if (user.notifications.find((alert:any)=>{return alert.topic === 'Zaproszenie do znajomych' && alert.fromId === msg.fromId}) !== undefined)
+                        return;
+
+
                     const invitePayload: Alert = {
                         topic: "Zaprosznie do znajomych",
                         info: `${msg.fromName} wysyła ci zaproszenie do grona znajomych`,
                         fromId: msg.fromId,
-                        toId: msg.toId
+                        toId: msg.toId,
+                        id: Math.random().toString(36).substr(2, 4),
+                        new: true
                     }
 
                     UserModel.updateOne(
@@ -107,15 +179,52 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                     }
                 };
 
-                fun();
+                inviteFriendFun();
                 break;
-            case 'friendAccept':
-                /*
-                    payload: {
-                        fromId: number,
-                        toId: number
-                    }
-                */
+            case 'acceptFriend':
+                const acceptAction = async () => {
+                    let requestAuthor: any = await UserModel.findById(msg.who);
+                    let invAuthor: any = await UserModel.findById(msg.fromId);
+
+                    const addFriend = async (firstUsr: any, secondUsr: any) => {
+                        if (!firstUsr.friends.includes(secondUsr._id)) {
+                            let newFriends = [...firstUsr.friends, String(secondUsr.toJSON().id)];
+                            //newFriends.push(secondUsr.id);
+                            console.log("newFriends:", newFriends);
+                            UserModel.updateOne(
+                                { _id: firstUsr._id}, 
+                                { friends: newFriends },
+                                {new: true},
+                                async (err: any, info: any) => {
+                                    if (err) {
+                                        console.warn("DB ERROR", err)
+                                    } else {
+                                        if (info) {
+                                            console.log("succes friend Add", info);
+                                        }
+                                        else {
+                                            console.warn("DB ERROR", info);
+                                        }
+                                    }
+                                }
+                            );
+    
+                            const friendInfo: FriendInfo = {
+                                name: secondUsr.name,
+                                status: secondUsr.status,
+                                desc: secondUsr.desc,
+                                icon: secondUsr.icon,
+                                joinTime: secondUsr.joinTime,
+                            };
+    
+                            UsersOnline.sendToUser(firstUsr._id, 'newFriend', friendInfo);
+                        }
+                    };
+
+                    addFriend(requestAuthor, invAuthor);
+                    addFriend(invAuthor, requestAuthor);
+                };
+                acceptAction();
                 break;
             case 'FriendMsgForward':
                 /*
