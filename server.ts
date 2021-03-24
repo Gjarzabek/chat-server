@@ -44,8 +44,39 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         
         switch(msg.method) {
             case 'close':
-                UsersOnline.removeUser(msg.id);
-                console.log("close connection, user id:", msg.id);
+                const closeAction = async () => {
+                    
+                    UserModel.updateOne(
+                        {_id: msg.id},
+                        {status: "niedostępny"},
+                        {new: true},
+                        async (err: any, user: any) => {
+                            if (err) {
+                                console.warn("DB ERROR", err)
+                            } else {
+                                if (user) {
+                                    console.log("succes status change", user);
+                                }
+                                else {
+                                    console.warn("DB ERROR", user);
+                                }
+                            }
+                        });
+                    
+                    UsersOnline.removeUser(msg.id);
+                    console.log("close connection, user id:", msg.id);
+                    
+                    const userInfo = (await UserModel.findById(msg.id))?.toObject();
+
+                    if (!userInfo)  return;
+                    
+                    //@ts-ignore
+                    for (let friend of userInfo.friends) {
+                        UsersOnline.sendToUser(friend.id, 'friendStatusUpdate', {id: msg.id, status:"niedostępny"});
+                    }
+                };
+
+                closeAction();
                 break;
             case 'isAlivePing':
                 /*
@@ -186,9 +217,9 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                     let requestAuthor: any = await UserModel.findById(msg.who);
                     let invAuthor: any = await UserModel.findById(msg.fromId);
 
-                    const addFriend = async (firstUsr: any, secondUsr: any) => {
+                    const addFriend = async (firstUsr: any, secondUsr: any, newFriendId: string) => {
                         if (!firstUsr.friends.includes(secondUsr._id)) {
-                            let newFriends = [...firstUsr.friends, String(secondUsr.toJSON().id)];
+                            let newFriends = [...firstUsr.friends, {id: newFriendId}];
                             //newFriends.push(secondUsr.id);
                             console.log("newFriends:", newFriends);
                             UserModel.updateOne(
@@ -210,6 +241,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                             );
     
                             const friendInfo: FriendInfo = {
+                                id: newFriendId,
                                 name: secondUsr.name,
                                 status: secondUsr.status,
                                 desc: secondUsr.desc,
@@ -221,8 +253,8 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                         }
                     };
 
-                    addFriend(requestAuthor, invAuthor);
-                    addFriend(invAuthor, requestAuthor);
+                    addFriend(requestAuthor, invAuthor, msg.fromId);
+                    addFriend(invAuthor, requestAuthor, msg.who);
                 };
                 acceptAction();
                 break;
@@ -316,14 +348,34 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             ws.close(1000, JSON.stringify(errMsg));
         }
         else {
-            let userDbInfo = await UserModel.findOne(
+            await UserModel.updateOne(
+                {_id: userInfo},
+                {status: "dostępny"},
+            );
+            let userDbInfo = (await UserModel.findOne(
                 {_id: userInfo},
                 '-_id name status email friends chats notifications desc icon joinTime groups'
-                );
+                ))?.toObject();
+
+            if (!userDbInfo) {
+                ws.close(1000, JSON.stringify({method: "ERROR", info:"Brak dostępu - nie rozpoznano użytkownika"}));
+                return;
+            }
+
+            let firendsData: Array<any> = [];
+            //@ts-ignore
+            for (let friend of userDbInfo.friends) {
+                UsersOnline.sendToUser(friend.id, 'friendStatusUpdate', {id: userInfo, status:"dostępny"});
+                const getFriend = async () => {firendsData.push(await UserModel.findById(friend.id, 'name status desc icon joinTime'))};
+                await getFriend();
+            }
+            //@ts-ignore
+            userDbInfo.friends = firendsData;
             ws.send(JSON.stringify({
                 method: 'loginPayload',
                 payload: userDbInfo
             }));
+
             console.log("new user connected:", userInfo);
             UsersOnline.addUser(userInfo, ws);
         }

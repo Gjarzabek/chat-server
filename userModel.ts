@@ -19,7 +19,10 @@ const UserSchema = new mongoose.Schema({
         unique: true
     },
     friends: [
-        {id: String}
+        {
+            id: String,
+            note: String
+        }
     ],
     chats: [
         {id: String}

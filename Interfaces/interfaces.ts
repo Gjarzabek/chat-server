@@ -18,9 +18,15 @@ export interface Alert {
 }
 
 export interface FriendInfo {
+    id: string,
     name: string,
     status: string,
     desc: string,
     icon: string,
     joinTime: string
+}
+
+export interface StatusInfo {
+    id: string,
+    status: string
 }
