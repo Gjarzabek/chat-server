@@ -6,7 +6,7 @@ import UserMap from './DataStructures/UserMap';
 import {initialUriVerify} from './baseLib/baselib';
 import mongoose from 'mongoose';
 import UserModel from './userModel';
-import { isRegularExpressionLiteral } from 'typescript';
+import { FileWatcherEventKind, isRegularExpressionLiteral } from 'typescript';
 const PORT: number = 8999;
 
 var UsersOnline: UserMap = new UserMap();
@@ -43,6 +43,43 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         const msg: any = JSON.parse(message);
         
         switch(msg.method) {
+            case 'notesChange':
+                const changeNotes = async () => {
+                    const userInfo = (await UserModel.findById(msg.id))?.toObject();
+                    if (!userInfo)  return;
+
+                    //@ts-ignore
+                    let userFriends = userInfo.friends;
+                    console.log(userFriends);
+
+                    for (const friend of userFriends) {
+                        for (let notePair of msg.newNotes) {
+                            if (notePair[0] === friend.id) {
+                                friend.note = notePair[1];
+                            }
+                        }
+                    }
+                    console.log(userFriends);
+
+                    UserModel.updateOne(
+                        {_id: msg.id},
+                        {friends: userFriends},
+                        {new: true},
+                        async (err: any, user: any) => {
+                            if (err) {
+                                console.warn("DB ERROR", err)
+                            } else {
+                                if (user) {
+                                    console.log("succes friends change", user);
+                                }
+                                else {
+                                    console.warn("DB ERROR", user);
+                                }
+                            }
+                    });
+                }
+                changeNotes();
+                break;
             case 'close':
                 const closeAction = async () => {
                     
@@ -86,21 +123,75 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 }
                 */
                 break;
-            case 'userchange':
-                // change attributes of user and send updates to all his friends
-                /*
-                    payload: {
-                        userid: number,
-                        islogged: boolean <-- to info trzymam na serwerze w DB
-                        loginTimestamp: number,
-                        userInfo: {
-                            desc: "" | string,
-                            status: "dostepny" | "zaraz-wracam" | "zajęty",
-                            icon: "bird" | "fsociety"
-                        }
+            case 'userChange':
+
+                const changeUser = async () => {
+                    const userInfo = (await UserModel.findById(msg.id))?.toObject();
+                    
+                    if (!userInfo) {
+                        console.error(msg);
                     }
-                */
-                // and ppl that are in group with him
+
+                    if (msg.desc) {
+                        UserModel.updateOne(
+                            {_id: msg.id},
+                            {desc: msg.desc},
+                            {new: true},
+                            async (err: any, user: any) => {
+                                if (err) {
+                                    console.warn("DB ERROR", err)
+                                } else {
+                                    if (user) {
+                                        console.log("succes desc change", user);
+                                    }
+                                    else {
+                                        console.warn("DB ERROR", user);
+                                    }
+                                }
+                        });
+                    }
+                    else if (msg.icon) {
+                        UserModel.updateOne(
+                            {_id: msg.id},
+                            {icon: msg.icon},
+                            {new: true},
+                            async (err: any, user: any) => {
+                                if (err) {
+                                    console.warn("DB ERROR", err)
+                                } else {
+                                    if (user) {
+                                        console.log("succes icon change", user);
+                                    }
+                                    else {
+                                        console.warn("DB ERROR", user);
+                                    }
+                                }
+                        });
+                    }
+                    else if (msg.status) {
+                        UserModel.updateOne(
+                            {_id: msg.id},
+                            {status: msg.status},
+                            {new: true},
+                            async (err: any, user: any) => {
+                                if (err) {
+                                    console.warn("DB ERROR", err)
+                                } else {
+                                    if (user) {
+                                        console.log("succes status change", user);
+                                    }
+                                    else {
+                                        console.warn("DB ERROR", user);
+                                    }
+                                }
+                        });
+                    }
+                    //@ts-ignore
+                    for (const friend of userInfo.friends) {
+                        UsersOnline.sendToUser(friend.id, 'friendInfoUpdate', msg);
+                    }
+                };
+                changeUser();
                 break;
             case 'markAlertsOld':
                 const f = async () => {
@@ -219,7 +310,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
                     const addFriend = async (firstUsr: any, secondUsr: any, newFriendId: string) => {
                         if (!firstUsr.friends.includes(secondUsr._id)) {
-                            let newFriends = [...firstUsr.friends, {id: newFriendId}];
+                            let newFriends = [...firstUsr.friends, {id: newFriendId, note: ""}];
                             //newFriends.push(secondUsr.id);
                             console.log("newFriends:", newFriends);
                             UserModel.updateOne(
@@ -337,7 +428,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         }
 
         //log the received message and send it back to the client
-        console.log('received: %s', message);
+        console.log('received: ', message);
     });
 
     const firstConnect = async () => {
@@ -366,7 +457,10 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             //@ts-ignore
             for (let friend of userDbInfo.friends) {
                 UsersOnline.sendToUser(friend.id, 'friendStatusUpdate', {id: userInfo, status:"dostępny"});
-                const getFriend = async () => {firendsData.push(await UserModel.findById(friend.id, 'name status desc icon joinTime'))};
+                const getFriend = async () => {
+                    let friendObj = (await UserModel.findById(friend.id, 'name status desc icon joinTime'))?.toObject();
+                    firendsData.push({...friendObj, note: friend.note});
+                };
                 await getFriend();
             }
             //@ts-ignore
