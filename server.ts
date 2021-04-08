@@ -229,7 +229,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 break;
             case 'deleteAlert':
                 // userId, alertId
-                const action = async () => {
+                const deleteAlert = async () => {
                     const user = await UserModel.findById(msg.userId);
                     //@ts-ignore
                     let oldAlerts = user.notifications;
@@ -254,7 +254,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                     );
                 }
 
-                action();
+                deleteAlert();
                 break;
             case 'friendInvite':
                 const inviteFriendFun = async () => {
@@ -349,6 +349,15 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 };
                 acceptAction();
                 break;
+            case 'friendChatCreate':
+                /*
+                    payload: {
+                        timestamp: number,
+                        fromUserId: number,
+                        toUserId: number
+                    }
+                */
+                break;
             case 'FriendMsgForward':
                 /*
                     payload: {
@@ -357,15 +366,6 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                         chatId: nubmer,
                         timestamp: nubmer,
                         msg: payload
-                    }
-                */
-                break;
-            case 'UniqueChatOpenRequest':
-                /*
-                    payload: {
-                        timestamp: number,
-                        fromUserId: number,
-                        toUserId: number
                     }
                 */
                 break;
@@ -458,7 +458,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             for (let friend of userDbInfo.friends) {
                 UsersOnline.sendToUser(friend.id, 'friendStatusUpdate', {id: userInfo, status:"dostępny"});
                 const getFriend = async () => {
-                    let friendObj = (await UserModel.findById(friend.id, 'name status desc icon joinTime'))?.toObject();
+                    let friendObj = (await UserModel.findById(friend.id, 'name status desc icon joinTime public'))?.toObject();
                     firendsData.push({...friendObj, note: friend.note});
                 };
                 await getFriend();
@@ -476,10 +476,8 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     }
 
     firstConnect();
-    //send immediatly a feedback to the incoming connection
 });
 
-//start our server
 server.listen(PORT, () => {
     console.log(`Server started on port ${PORT} |0_0|`);
 });
