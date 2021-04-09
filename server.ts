@@ -6,7 +6,8 @@ import UserMap from './DataStructures/UserMap';
 import {initialUriVerify} from './baseLib/baselib';
 import mongoose from 'mongoose';
 import UserModel from './userModel';
-import { FileWatcherEventKind, isRegularExpressionLiteral } from 'typescript';
+import ChatModel from './chatModel';
+
 const PORT: number = 8999;
 
 var UsersOnline: UserMap = new UserMap();
@@ -350,13 +351,66 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 acceptAction();
                 break;
             case 'friendChatCreate':
-                /*
-                    payload: {
-                        timestamp: number,
-                        fromUserId: number,
-                        toUserId: number
+                const chatCreate = async (userId: string, friendId: string): Promise<void> => {
+                    let friendRecord: any = await UserModel.findById(friendId);
+
+                    // check if chat bettween this two users allready exists
+                    for (const chatId of friendRecord.chats) {
+                        const chatRecord = (await ChatModel.findById(chatId))?.toObject();
+                        //@ts-ignore
+                        const chatUsers = chatRecord.users;
+                        if (!chatRecord || !chatUsers) {
+                            console.error('empty chat id inside', friendId, 'chats');
+                            continue;
+                        }
+
+                        if (chatUsers[0] === userId && chatUsers[1] === friendId || chatUsers[1] === userId && chatUsers[0] === friendId) {                            
+                            UsersOnline.sendToUser(userId, 'newChat', chatRecord);
+                            return;
+                        }
                     }
-                */
+
+                    const newChat = new ChatModel({
+                        users: [userId, friendId]
+                    });
+
+                    newChat.save((err: mongoose.CallbackError, doc: mongoose.Document<any, {}> | undefined) => {
+                        if (err) {
+                            console.warn('Failed to save chat id DB! -', err);
+                        }
+                        else if (!doc) {
+                            console.error('Failed to save chat id DB!');
+                        }
+                        else {
+                            console.log("Chat add success");
+
+                            const updateUserChats = async (uId: string): Promise<void> => {
+                                UserModel.updateOne(
+                                    { _id: uId },
+                                    { $push: { chats: doc._id } },
+                                    {new: true},
+                                    async (err: any, user: any) => {
+                                        if (err) {
+                                            console.warn("DB ERROR", err)
+                                        } else {
+                                            if (user) {
+                                                console.log(uId, "succes updateUserChats", user);
+                                            }
+                                            else {
+                                                console.warn("DB ERROR", user);
+                                            }
+                                        }
+                                    }
+                                );
+                            }
+                            UsersOnline.sendToUser(userId, 'newChat', doc);
+                            updateUserChats(userId);
+                            updateUserChats(friendId);
+                        }
+                    });
+                }
+
+                chatCreate(msg.userId, msg.friendId);
                 break;
             case 'FriendMsgForward':
                 /*
@@ -463,8 +517,16 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 };
                 await getFriend();
             }
+            let chatsData: Array<any> = [];
+            //@ts-ignore
+            for (const chatId of userDbInfo.chats) {
+                const chatObj = (await ChatModel.findById(chatId))?.toObject();
+                chatsData.push(chatObj);
+            }
             //@ts-ignore
             userDbInfo.friends = firendsData;
+            //@ts-ignore
+            userDbInfo.chats = chatsData;
             ws.send(JSON.stringify({
                 method: 'loginPayload',
                 payload: userDbInfo

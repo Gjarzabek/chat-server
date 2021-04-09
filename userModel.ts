@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import ChatModel from './chatModel';
 
 const UserSchema = new mongoose.Schema({
     _id: String, 
@@ -21,11 +22,9 @@ const UserSchema = new mongoose.Schema({
         unique: true
     },
     friends: [
-        {id: String}
+        {id: String, note: String}
     ],
-    chats: [
-        {id: String}
-    ],
+    chats: [],
     notifications: [],
     desc: String,
     icon: {
