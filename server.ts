@@ -354,6 +354,10 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 const chatCreate = async (userId: string, friendId: string): Promise<void> => {
                     let friendRecord: any = await UserModel.findById(friendId);
 
+                    if (!friendRecord) {
+                        console.warn('bad request');
+                        return;
+                    }
                     // check if chat bettween this two users allready exists
                     for (const chatId of friendRecord.chats) {
                         const chatRecord = (await ChatModel.findById(chatId))?.toObject();
