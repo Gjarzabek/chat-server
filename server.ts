@@ -339,6 +339,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                                 desc: secondUsr.desc,
                                 icon: secondUsr.icon,
                                 joinTime: secondUsr.joinTime,
+                                public: secondUsr.public
                             };
     
                             UsersOnline.sendToUser(firstUsr._id, 'newFriend', friendInfo);
@@ -368,14 +369,14 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                             continue;
                         }
 
-                        if (chatUsers[0] === userId && chatUsers[1] === friendId || chatUsers[1] === userId && chatUsers[0] === friendId) {                            
+                        if (chatUsers[0].userId === userId && chatUsers[1].userId === friendId || chatUsers[1].userId === userId && chatUsers[0].userId === friendId) {                            
                             UsersOnline.sendToUser(userId, 'newChat', chatRecord);
                             return;
                         }
                     }
 
                     const newChat = new ChatModel({
-                        users: [userId, friendId]
+                        users: [{userId: userId, messages: []}, {userId: friendId, messages: []}]
                     });
 
                     newChat.save((err: mongoose.CallbackError, doc: mongoose.Document<any, {}> | undefined) => {
@@ -415,6 +416,8 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 }
 
                 chatCreate(msg.userId, msg.friendId);
+                break;
+            case 'message':
                 break;
             case 'FriendMsgForward':
                 /*
@@ -503,7 +506,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             );
             let userDbInfo = (await UserModel.findOne(
                 {_id: userInfo},
-                '-_id name status email friends chats notifications desc icon joinTime groups'
+                '-_id name status email friends chats notifications desc icon joinTime groups public'
                 ))?.toObject();
 
             if (!userDbInfo) {

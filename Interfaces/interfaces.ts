@@ -23,7 +23,8 @@ export interface FriendInfo {
     status: string,
     desc: string,
     icon: string,
-    joinTime: string
+    joinTime: string,
+    public: string
 }
 
 export interface StatusInfo {
