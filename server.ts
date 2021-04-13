@@ -32,6 +32,34 @@ mongoose.connect(URI,
     }
 )
 
+function fetchChatInfo(chatDoc: any, userId: any): any {
+    let chatInfo = {_id: chatDoc._id, messages: undefined, users: []};
+    chatInfo.messages = chatDoc.userId === userId ? chatDoc.userMessages : chatDoc.friendMessages;
+    //@ts-ignore
+    chatInfo.users = [chatDoc.userId, chatDoc.friendId];
+    return chatInfo;
+}
+
+function addAlert(userId: string, alertObj: Alert): void {
+    UserModel.updateOne(
+        { _id: userId }, 
+        { $push: { notifications: alertObj } },
+        {new: true},
+        async (err: any, user: any) => {
+            if (err) {
+                console.warn("DB ERROR", err)
+            } else {
+                if (user) {
+                    console.log("succes alert Add", user);
+                }
+                else {
+                    console.warn("DB ERROR", user);
+                }
+            }
+        }
+    );
+}
+
 WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     ws.on('close', (code: number, info: string) => {
@@ -363,20 +391,19 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                     for (const chatId of friendRecord.chats) {
                         const chatRecord = (await ChatModel.findById(chatId))?.toObject();
                         //@ts-ignore
-                        const chatUsers = chatRecord.users;
-                        if (!chatRecord || !chatUsers) {
+                        if (!chatRecord) {
                             console.error('empty chat id inside', friendId, 'chats');
                             continue;
                         }
-
-                        if (chatUsers[0].userId === userId && chatUsers[1].userId === friendId || chatUsers[1].userId === userId && chatUsers[0].userId === friendId) {                            
-                            UsersOnline.sendToUser(userId, 'newChat', chatRecord);
+                        //@ts-ignore
+                        if (chatRecord.userId === userId && chatRecord.friendId === friendId || chatRecord.friendId === userId && chatRecord.userId === friendId) {                            
+                            UsersOnline.sendToUser(userId, 'newChat', fetchChatInfo(chatRecord, userId));
                             return;
                         }
                     }
 
                     const newChat = new ChatModel({
-                        users: [{userId: userId, messages: []}, {userId: friendId, messages: []}]
+                        userId: userId, friendId: friendId , userMessages: [], friendMessages: []
                     });
 
                     newChat.save((err: mongoose.CallbackError, doc: mongoose.Document<any, {}> | undefined) => {
@@ -408,7 +435,8 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                                     }
                                 );
                             }
-                            UsersOnline.sendToUser(userId, 'newChat', doc);
+                            const docObj = doc.toObject();
+                            UsersOnline.sendToUser(userId, 'newChat', fetchChatInfo(docObj, userId));
                             updateUserChats(userId);
                             updateUserChats(friendId);
                         }
@@ -418,6 +446,105 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                 chatCreate(msg.userId, msg.friendId);
                 break;
             case 'message':
+                const onMessage = async () => {
+                    let chatObj = (await ChatModel.findById(msg.chatId))?.toObject();
+                    
+                    const userMessage: any = {
+                        timestamp: msg.timestamp,
+                        content: msg.authorData,
+                        authorId: msg.userId
+                    };
+                    
+                    const friendMessage: any = {
+                        timestamp: msg.timestamp,
+                        content: msg.friendData,
+                        authorId: msg.userId
+                    };
+                    //@ts-ignore
+                    const friendId = chatObj.userId !== msg.userId ? chatObj.userId : chatObj.friendId;
+
+                    const saveMessage = async (firstUserMessages: any, secondMessages: any, firstId: string, secondId: string) => {
+                        ChatModel.updateOne(
+                            {_id: msg.chatId},
+                            {$push: {userMessages: firstUserMessages}},
+                            {new: true},
+                            async (err: any, chat: any) => {
+                                if (err) {
+                                    console.warn("DB ERROR", err)
+                                } else {
+                                    if (chat) {
+                                        console.log('changed chat', chat);
+                                        //@ts-ignore
+                                        let messages = (await ChatModel.findById(msg.chatId))?.toObject().userMessages;
+                                        const newMessId = messages[messages.length - 1]._id;
+                                        console.log("New message ID", newMessId);
+
+                                        UsersOnline.sendToUser(firstId, 'messageConfirm', {
+                                            tempId: msg.tempMessageId,
+                                            messageId : newMessId,
+                                            chatId: msg.chatId
+                                        });
+
+                                    }
+                                    else {
+                                        console.warn("DB ERROR", chat);
+                                    }
+                                }
+                            }
+                        );
+                        ChatModel.updateOne(
+                            {_id: msg.chatId},
+                            {$push: {friendMessages: secondMessages}},
+                            {new: true},
+                            async (err: any, chat: any) => {
+                                if (err) {
+                                    console.warn("DB ERROR", err)
+                                } else {
+                                    if (chat) {
+                                        console.log('changed chat', chat);
+                                        //@ts-ignore
+                                        let messages = (await ChatModel.findById(msg.chatId))?.toObject().friendMessages;
+                                        const newMessId = messages[messages.length - 1]._id;
+                                        console.log("New message ID", newMessId);
+                                        if (!UsersOnline.isOnline(secondId)) {
+                                            addAlert(secondId, {
+                                                topic: "Message",
+                                                fromId: msg.userId,
+                                                id: Math.random().toString(36).substr(2, 4),
+                                                new: true,
+                                                chatId: msg.chatId
+                                            });
+                                        }
+                                        else {
+                                            UsersOnline.sendToUser(secondId, 'newMessage', {
+                                                friendId: msg.userId,
+                                                chatId: msg.chatId,
+                                                friendData: msg.friendData,
+                                                timestamp: msg.timestamp,
+                                                msgId: secondId
+                                            });
+                                        }
+                                            return;
+                                        }
+                                    else {
+                                        console.warn("DB ERROR", chat);
+                                    }
+                                }
+                            }
+                        );
+                    };
+                    console.log("chatObj", chatObj);
+                    console.log("msg", msg);
+                    //@ts-ignore
+                    if (msg.userId === chatObj.userId) {
+                        saveMessage(userMessage, friendMessage, msg.userId, friendId);
+                    }
+                    else {
+                        console.log('')
+                        saveMessage(friendMessage, userMessage, msg.userId, friendId);
+                    }
+                };
+                onMessage();
                 break;
             case 'FriendMsgForward':
                 /*
@@ -527,8 +654,8 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             let chatsData: Array<any> = [];
             //@ts-ignore
             for (const chatId of userDbInfo.chats) {
-                const chatObj = (await ChatModel.findById(chatId))?.toObject();
-                chatsData.push(chatObj);
+                let chatObj = (await ChatModel.findById(chatId))?.toObject();
+                chatsData.push(fetchChatInfo(chatObj, userInfo));
             }
             //@ts-ignore
             userDbInfo.friends = firendsData;

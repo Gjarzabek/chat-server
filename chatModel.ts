@@ -1,24 +1,22 @@
 import mongoose from 'mongoose';
 
 const ChatSchema = new mongoose.Schema({
-    users: [
+    userId: String,
+    friendId: String,
+    userMessages: [
         {
-            userId: String,
-            messages: [
-                {
-                    timestamp: Number,
-                    content: String,
-                    author: {
-                        id: String,
-                    },
-                    id: Number
-                }
-            ]
+            timestamp: Number,
+            authorId: String,
+            content: String
         }
     ],
-    type: {
-        type: Number
-    }
-}, { _id: false });
+    friendMessages: [
+        {
+            timestamp: Number,
+            authorId: String,
+            content: String
+        }
+    ]
+});
 
 export default mongoose.model('Chat', ChatSchema, 'chats');

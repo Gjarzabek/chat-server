@@ -10,11 +10,12 @@ export interface msgType {
 
 export interface Alert {
     topic: string,
-    info: string,
+    info?: string,
     fromId: string,
-    toId: string
-    id: string
-    new: boolean
+    toId?: string,
+    id: string,
+    new: boolean,
+    chatId?: string
 }
 
 export interface FriendInfo {
@@ -30,4 +31,15 @@ export interface FriendInfo {
 export interface StatusInfo {
     id: string,
     status: string
+}
+
+export interface MessageConfirmation {
+    tempId: number,
+    messageId : number;
+    chatId: string
+}
+
+export interface NewMessage {
+    chatId: string,
+
 }
