@@ -15,7 +15,8 @@ export interface Alert {
     toId?: string,
     id: string,
     new: boolean,
-    chatId?: string
+    chatId?: string,
+    timestamp: number
 }
 
 export interface FriendInfo {

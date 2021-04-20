@@ -303,7 +303,8 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                         fromId: msg.fromId,
                         toId: msg.toId,
                         id: Math.random().toString(36).substr(2, 4),
-                        new: true
+                        new: true,
+                        timestamp: (new Date()).getTime()
                     }
 
                     UserModel.updateOne(
@@ -437,6 +438,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                             }
                             const docObj = doc.toObject();
                             UsersOnline.sendToUser(userId, 'newChat', fetchChatInfo(docObj, userId));
+                            UsersOnline.sendToUser(friendId, 'newChat', fetchChatInfo(docObj, friendId));
                             updateUserChats(userId);
                             updateUserChats(friendId);
                         }
@@ -509,10 +511,12 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                                         if (!UsersOnline.isOnline(secondId)) {
                                             addAlert(secondId, {
                                                 topic: "Message",
+                                                info: `Wiadomość od ${msg.userId}`,
                                                 fromId: msg.userId,
                                                 id: Math.random().toString(36).substr(2, 4),
                                                 new: true,
-                                                chatId: msg.chatId
+                                                chatId: msg.chatId,
+                                                timestamp: (new Date()).getTime()
                                             });
                                         }
                                         else {
@@ -540,7 +544,6 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                         saveMessage(userMessage, friendMessage, msg.userId, friendId);
                     }
                     else {
-                        console.log('')
                         saveMessage(friendMessage, userMessage, msg.userId, friendId);
                     }
                 };
