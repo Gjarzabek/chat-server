@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import ChatModel from './chatModel';
 
 const UserSchema = new mongoose.Schema({
     _id: String, 
@@ -22,7 +21,7 @@ const UserSchema = new mongoose.Schema({
         unique: true
     },
     friends: [
-        {id: String, note: String}
+        {id: String, note: {type: String, default: ""}}
     ],
     chats: [],
     notifications: [],
@@ -30,6 +29,10 @@ const UserSchema = new mongoose.Schema({
     icon: {
         type: String,
         default: "bird"
+    },
+    color: {
+        type: String,
+        default: "#b5b5b5"
     },
     joinTime: String
 }, { _id: false });

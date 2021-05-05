@@ -215,6 +215,24 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                                 }
                         });
                     }
+                    else if (msg.color) {
+                        UserModel.updateOne(
+                            {_id: msg.id},
+                            {color: msg.color},
+                            {new: true},
+                            async (err: any, user: any) => {
+                                if (err) {
+                                    console.warn("DB ERROR", err)
+                                } else {
+                                    if (user) {
+                                        console.log("succes color change", user);
+                                    }
+                                    else {
+                                        console.warn("DB ERROR", user);
+                                    }
+                                }
+                        });    
+                    }
                     //@ts-ignore
                     for (const friend of userInfo.friends) {
                         UsersOnline.sendToUser(friend.id, 'friendInfoUpdate', msg);
@@ -362,16 +380,17 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                             );
     
                             const friendInfo: FriendInfo = {
-                                id: newFriendId,
+                                _id: newFriendId,
                                 name: secondUsr.name,
                                 status: secondUsr.status,
                                 desc: secondUsr.desc,
                                 icon: secondUsr.icon,
                                 joinTime: secondUsr.joinTime,
-                                public: secondUsr.public
+                                public: secondUsr.public,
+                                color: secondUsr.color
                             };
     
-                            UsersOnline.sendToUser(firstUsr._id, 'newFriend', friendInfo);
+                            UsersOnline.sendToUser(firstUsr._id, 'newFriend', {...friendInfo, note: ''});
                         }
                     };
 
@@ -636,7 +655,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             );
             let userDbInfo = (await UserModel.findOne(
                 {_id: userInfo},
-                '-_id name status email friends chats notifications desc icon joinTime groups public'
+                '-_id name status email friends chats notifications desc icon joinTime groups public color'
                 ))?.toObject();
 
             if (!userDbInfo) {
@@ -649,7 +668,7 @@ WsServer.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             for (let friend of userDbInfo.friends) {
                 UsersOnline.sendToUser(friend.id, 'friendStatusUpdate', {id: userInfo, status:"dostępny"});
                 const getFriend = async () => {
-                    let friendObj = (await UserModel.findById(friend.id, 'name status desc icon joinTime public'))?.toObject();
+                    let friendObj = (await UserModel.findById(friend.id, 'name status desc icon joinTime public color'))?.toObject();
                     firendsData.push({...friendObj, note: friend.note});
                 };
                 await getFriend();
